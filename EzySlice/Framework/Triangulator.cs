@@ -34,6 +34,18 @@ namespace EzySlice {
 			}
 		}
 
+        public struct SlicedFaceProjection
+        {
+            public Vector2 MinimumProjectedBoundCorner;
+            public Vector2 ProjectedBoundDimensions;
+
+            public SlicedFaceProjection(Vector2 minimumPoint, Vector2 dimensions)
+            {
+                MinimumProjectedBoundCorner = minimumPoint;
+                ProjectedBoundDimensions = dimensions;
+            }
+        }
+
 		/**
 		 * Overloaded variant of MonotoneChain which will calculate UV coordinates of the Triangles
 		 * between 0.0 and 1.0 (default).
@@ -52,11 +64,29 @@ namespace EzySlice {
 		 * as arrays
 		 */
 		public static bool MonotoneChain(List<Vector3> vertices, Vector3 normal, out List<Triangle> tri, TextureRegion texRegion) {
+            SlicedFaceProjection projection;
+            return MonotoneChain(vertices, normal, out tri, texRegion, Vector2.positiveInfinity, Vector2.negativeInfinity, out projection);
+		}
+
+        /**
+         * O(n log n) Convex Hull Algorithm. 
+         * Accepts a list of vertices as Vector3 and triangulates them according to a projection
+         * plane defined as planeNormal. Algorithm will output vertices, indices and UV coordinates
+         * as arrays
+         */
+        public static bool MonotoneChain(List<Vector3> vertices, Vector3 normal, out List<Triangle> tri, TextureRegion texRegion, out SlicedFaceProjection projectionResults)
+        {
+            return MonotoneChain(vertices, normal, out tri, texRegion, Vector2.positiveInfinity, Vector2.negativeInfinity, out projectionResults);
+        }
+
+        public static bool MonotoneChain(List<Vector3> vertices, Vector3 normal, out List<Triangle> tri, TextureRegion texRegion, Vector2 minFull, Vector2 fullDimensions, out SlicedFaceProjection projectionResults )
+		{
 			int count = vertices.Count;
 
 			// we cannot triangulate less than 3 points. Use minimum of 3 points
 			if (count < 3) {
 				tri = null;
+                projectionResults = new SlicedFaceProjection();
 				return false;
 			}
 
@@ -72,10 +102,8 @@ namespace EzySlice {
 			Mapped2D[] mapped = new Mapped2D[count];
 
 			// these values will be used to generate new UV coordinates later on
-			float maxDivX = float.MinValue;
-			float maxDivY = float.MinValue;
-			float minDivX = float.MaxValue;
-			float minDivY = float.MaxValue;
+			Vector2 minDiv = Vector2.positiveInfinity;
+			Vector2 maxDiv = Vector2.negativeInfinity;
 
 			// map the 3D vertices into the 2D mapped values
 			for (int i = 0; i < count; i++) {
@@ -85,10 +113,10 @@ namespace EzySlice {
 				Vector2 mapVal = newMappedValue.mappedValue;
 
 				// grab our maximal values so we can map UV's in a proper range
-				maxDivX = Mathf.Max(maxDivX, mapVal.x);
-				maxDivY = Mathf.Max(maxDivY, mapVal.y);
-				minDivX = Mathf.Min(minDivX, mapVal.x);
-				minDivY = Mathf.Min(minDivY, mapVal.y);
+				maxDiv.x = Mathf.Max(maxDiv.x, mapVal.x);
+				maxDiv.y = Mathf.Max(maxDiv.y, mapVal.y);
+				minDiv.x = Mathf.Min(minDiv.x, mapVal.x);
+				minDiv.y = Mathf.Min(minDiv.y, mapVal.y);
 
 				mapped[i] = newMappedValue;
 			}
@@ -149,16 +177,22 @@ namespace EzySlice {
 			// this should not happen, but here just in case
 			if (vertCount < 3) {
 				tri = null;
+                projectionResults = new SlicedFaceProjection();
 				return false;
 			}
 
 			// ensure List does not dynamically grow, performing copy ops each time!
 			tri = new List<Triangle>(triCount / 3);
 
-			float maxDiv = Mathf.Max(maxDivX, maxDivY);
+			Vector2 dimensions = maxDiv - minDiv;
+            projectionResults = new SlicedFaceProjection(minDiv, dimensions);
 
-			float width = maxDivX - minDivX;
-			float height = maxDivY - minDivY;
+			if ( fullDimensions.x > dimensions.x || fullDimensions.y > dimensions.y)
+			{
+				dimensions.x = fullDimensions.x;
+				dimensions.y = fullDimensions.y;
+				minDiv = minFull;
+			}
 
 			int indexCount = 1;
 
@@ -174,14 +208,14 @@ namespace EzySlice {
 				Vector2 uvB = posB.mappedValue;
 				Vector2 uvC = posC.mappedValue;
 
-				uvA.x = (uvA.x - minDivX) / width;
-				uvA.y = (uvA.y - minDivY) / height;
+				uvA.x = (uvA.x - minDiv.x) / dimensions.x;
+				uvA.y = (uvA.y - minDiv.y) / dimensions.y;
 
-				uvB.x = (uvB.x - minDivX) / width;
-				uvB.y = (uvB.y - minDivY) / height;
+				uvB.x = (uvB.x - minDiv.x) / dimensions.x;
+				uvB.y = (uvB.y - minDiv.y) / dimensions.y;
 
-				uvC.x = (uvC.x - minDivX) / width;
-				uvC.y = (uvC.y - minDivY) / height;
+				uvC.x = (uvC.x - minDiv.x) / dimensions.x;
+				uvC.y = (uvC.y - minDiv.y) / dimensions.y;
 
 				Triangle newTriangle = new Triangle(posA.originalValue, posB.originalValue, posC.originalValue);
 

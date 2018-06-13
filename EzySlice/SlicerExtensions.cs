@@ -10,15 +10,28 @@ namespace EzySlice {
         /**
          * SlicedHull Return functions and appropriate overrides!
          */
-        public static SlicedHull Slice(this GameObject obj, Plane pl, Material crossSectionMaterial = null) {
+        public static SlicedHull Slice(this GameObject obj, Plane pl, Material crossSectionMaterial = null)
+        {
             return Slice(obj, pl, new TextureRegion(0.0f, 0.0f, 1.0f, 1.0f), crossSectionMaterial);
         }
 
-        public static SlicedHull Slice(this GameObject obj, Vector3 position, Vector3 direction, Material crossSectionMaterial = null) {
+        public static SlicedHull Slice(this GameObject obj, Mesh originalMesh, Plane pl, Material crossSectionMaterial = null)
+        {
+            return Slice(obj, originalMesh, pl, new TextureRegion(0.0f, 0.0f, 1.0f, 1.0f), crossSectionMaterial);
+        }
+
+        public static SlicedHull Slice(this GameObject obj, Vector3 position, Vector3 direction, Material crossSectionMaterial = null)
+        {
             return Slice(obj, position, direction, new TextureRegion(0.0f, 0.0f, 1.0f, 1.0f), crossSectionMaterial);
         }
 
-        public static SlicedHull Slice(this GameObject obj, Vector3 position, Vector3 direction, TextureRegion textureRegion, Material crossSectionMaterial = null) {
+        public static SlicedHull Slice(this GameObject obj, Mesh originalMesh, Vector3 position, Vector3 direction, Material crossSectionMaterial = null)
+        {
+            return Slice(obj, originalMesh, position, direction, new TextureRegion(0.0f, 0.0f, 1.0f, 1.0f), crossSectionMaterial);
+        }
+
+        public static SlicedHull Slice(this GameObject obj, Vector3 position, Vector3 direction, TextureRegion textureRegion, Material crossSectionMaterial = null)
+        {
             Plane cuttingPlane = new Plane();
 
             Vector3 refUp = obj.transform.InverseTransformDirection(direction);
@@ -29,8 +42,26 @@ namespace EzySlice {
             return Slice(obj, cuttingPlane, textureRegion, crossSectionMaterial);
         }
 
-        public static SlicedHull Slice(this GameObject obj, Plane pl, TextureRegion textureRegion, Material crossSectionMaterial = null) {
+        public static SlicedHull Slice(this GameObject obj, Mesh originalMesh, Vector3 position, Vector3 direction, TextureRegion textureRegion, Material crossSectionMaterial = null)
+        {
+            Plane cuttingPlane = new Plane();
+
+            Vector3 refUp = obj.transform.InverseTransformDirection(direction);
+            Vector3 refPt = obj.transform.InverseTransformPoint(position);
+
+            cuttingPlane.Compute(refPt, refUp);
+
+            return Slice(obj, originalMesh, cuttingPlane, textureRegion, crossSectionMaterial);
+        }
+
+        public static SlicedHull Slice(this GameObject obj, Plane pl, TextureRegion textureRegion, Material crossSectionMaterial = null)
+        {
             return Slicer.Slice(obj, pl, textureRegion, crossSectionMaterial);
+        }
+
+        public static SlicedHull Slice(this GameObject obj, Mesh originalMesh, Plane pl, TextureRegion textureRegion, Material crossSectionMaterial = null)
+        {
+            return Slicer.Slice(obj, originalMesh, pl, textureRegion, crossSectionMaterial);
         }
 
         /**
@@ -40,12 +71,26 @@ namespace EzySlice {
             return SliceInstantiate(obj, pl, new TextureRegion(0.0f, 0.0f, 1.0f, 1.0f));
         }
 
+        public static GameObject[] SliceInstantiate(this GameObject obj, Mesh originalMesh, Plane pl)
+        {
+            return SliceInstantiate(obj, originalMesh, pl, new TextureRegion(0.0f, 0.0f, 1.0f, 1.0f));
+        }
+
         public static GameObject[] SliceInstantiate(this GameObject obj, Vector3 position, Vector3 direction) {
             return SliceInstantiate(obj, position, direction, null);
         }
 
+        public static GameObject[] SliceInstantiate(this GameObject obj, Mesh originalMesh, Vector3 position, Vector3 direction)
+        {
+            return SliceInstantiate(obj, originalMesh, position, direction, null);
+        }
+
         public static GameObject[] SliceInstantiate(this GameObject obj, Vector3 position, Vector3 direction, Material crossSectionMat) {
             return SliceInstantiate(obj, position, direction, new TextureRegion(0.0f, 0.0f, 1.0f, 1.0f), crossSectionMat);
+        }
+
+        public static GameObject[] SliceInstantiate(this GameObject obj, Mesh originalMesh, Vector3 position, Vector3 direction, Material crossSectionMat) {
+            return SliceInstantiate(obj, originalMesh, position, direction, new TextureRegion(0.0f, 0.0f, 1.0f, 1.0f), crossSectionMat);
         }
 
         public static GameObject[] SliceInstantiate(this GameObject obj, Vector3 position, Vector3 direction, TextureRegion cuttingRegion, Material crossSectionMaterial = null) {
@@ -57,6 +102,17 @@ namespace EzySlice {
             cuttingPlane.Compute(refPt, refUp);
 
             return SliceInstantiate(obj, cuttingPlane, cuttingRegion, crossSectionMaterial);
+        }
+
+        public static GameObject[] SliceInstantiate(this GameObject obj, Mesh originalMesh, Vector3 position, Vector3 direction, TextureRegion cuttingRegion, Material crossSectionMaterial = null) {
+            EzySlice.Plane cuttingPlane = new EzySlice.Plane();
+
+            Vector3 refUp = obj.transform.InverseTransformDirection(direction);
+            Vector3 refPt = obj.transform.InverseTransformPoint(position);
+
+            cuttingPlane.Compute(refPt, refUp);
+
+            return SliceInstantiate(obj, originalMesh, cuttingPlane, cuttingRegion, crossSectionMaterial);
         }
 
         public static GameObject[] SliceInstantiate(this GameObject obj, Plane pl, TextureRegion cuttingRegion, Material crossSectionMaterial = null) {
@@ -80,6 +136,38 @@ namespace EzySlice {
 
             // otherwise return only the lower hull
             if (lowerHull != null) {
+                return new GameObject[] { lowerHull };
+            }
+
+            // nothing to return, so return nothing!
+            return null;
+        }
+
+        public static GameObject[] SliceInstantiate(this GameObject obj, Mesh originalMesh, Plane pl, TextureRegion cuttingRegion, Material crossSectionMaterial = null) {
+            SlicedHull slice = Slicer.Slice(obj, originalMesh, pl, cuttingRegion, crossSectionMaterial);
+
+            if (slice == null)
+            {
+                return null;
+            }
+
+            GameObject upperHull = slice.CreateUpperHull(obj, crossSectionMaterial);
+            GameObject lowerHull = slice.CreateLowerHull(obj, crossSectionMaterial);
+
+            if (upperHull != null && lowerHull != null)
+            {
+                return new GameObject[] { upperHull, lowerHull };
+            }
+
+            // otherwise return only the upper hull
+            if (upperHull != null)
+            {
+                return new GameObject[] { upperHull };
+            }
+
+            // otherwise return only the lower hull
+            if (lowerHull != null)
+            {
                 return new GameObject[] { lowerHull };
             }
 
